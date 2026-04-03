@@ -1,56 +1,97 @@
-import { useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import * as Google from 'expo-auth-session/providers/google';
-import * as WebBrowser from 'expo-web-browser';
-import { GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
+import { useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 
-WebBrowser.maybeCompleteAuthSession();
-
 export default function LoginScreen() {
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    androidClientId: '838025421696-3kigaah3qsvlh0mficp9j8e6d2v3tsrl.apps.googleusercontent.com',
-    webClientId: '838025421696-7nokf5etd25rgfrncltjjrq05r90er9r.apps.googleusercontent.com',
-  });
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isSignUp, setIsSignUp] = useState(false);
 
-  useEffect(() => {
-    if (response?.type === 'success') {
-      const { id_token } = response.params;
-      const credential = GoogleAuthProvider.credential(id_token);
-      signInWithCredential(auth, credential).then(async (result) => {
-        const user = result.user;
-        const userRef = doc(db, 'users', user.uid);
-        const userSnap = await getDoc(userRef);
-        if (!userSnap.exists()) {
-          await setDoc(userRef, {
-            uid: user.uid,
-            email: user.email,
-            name: user.displayName,
-            photo: user.photoURL,
-            status: 'pending',
-            createdAt: new Date(),
-          });
-        }
-      });
+  const handleAuth = async () => {
+  if (!email || !password) return Alert.alert('Error', 'Fill in all fields');
+  try {
+    if (isSignUp) {
+      const result = await createUserWithEmailAndPassword(auth, email, password);
+      const user = result.user;
+      console.log('Auth success, UID:', user.uid);
+      const userRef = doc(db, 'users', user.uid);
+      const userSnap = await getDoc(userRef);
+      console.log('Doc exists:', userSnap.exists());
+      if (!userSnap.exists()) {
+        await setDoc(userRef, {
+          uid: user.uid,
+          email: user.email,
+          name: user.email.split('@')[0],
+          photo: null,
+          status: 'pending',
+          createdAt: new Date(),
+        });
+        console.log('User doc written successfully');
+      }
+    } else {
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      const user = result.user;
+      console.log('Signed in, UID:', user.uid);
+      const userRef = doc(db, 'users', user.uid);
+      const userSnap = await getDoc(userRef);
+      console.log('Doc exists on signin:', userSnap.exists());
+      if (!userSnap.exists()) {
+        await setDoc(userRef, {
+          uid: user.uid,
+          email: user.email,
+          name: user.email.split('@')[0],
+          photo: null,
+          status: 'pending',
+          createdAt: new Date(),
+        });
+        console.log('User doc created on signin');
+      }
     }
-  }, [response]);
+  } catch (error) {
+    console.log('Error:', error.code, error.message);
+    Alert.alert('Error', error.message);
+  }
+};
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Harsh App</Text>
       <Text style={styles.subtitle}>Chat with your people</Text>
-      <TouchableOpacity style={styles.button} onPress={() => promptAsync()}>
-        <Text style={styles.buttonText}>Sign in with Google</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Email"
+        value={email}
+        onChangeText={setEmail}
+        autoCapitalize="none"
+        keyboardType="email-address"
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Password"
+        value={password}
+        onChangeText={setPassword}
+        secureTextEntry
+      />
+      <TouchableOpacity style={styles.button} onPress={handleAuth}>
+        <Text style={styles.buttonText}>{isSignUp ? 'Sign Up' : 'Sign In'}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={() => setIsSignUp(!isSignUp)}>
+        <Text style={styles.toggle}>
+          {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
+        </Text>
       </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' },
+  container: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff', padding: 24 },
   title: { fontSize: 32, fontWeight: 'bold', marginBottom: 8 },
   subtitle: { fontSize: 16, color: '#666', marginBottom: 48 },
-  button: { backgroundColor: '#4285F4', paddingHorizontal: 32, paddingVertical: 14, borderRadius: 8 },
+  input: { width: '100%', borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 14, marginBottom: 12, fontSize: 16 },
+  button: { backgroundColor: '#4285F4', width: '100%', padding: 14, borderRadius: 8, alignItems: 'center', marginTop: 8 },
   buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  toggle: { marginTop: 16, color: '#4285F4', fontSize: 14 },
 });
