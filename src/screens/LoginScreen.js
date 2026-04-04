@@ -21,13 +21,17 @@ export default function LoginScreen() {
       console.log('Doc exists:', userSnap.exists());
       if (!userSnap.exists()) {
         await setDoc(userRef, {
-          uid: user.uid,
-          email: user.email,
-          name: user.email.split('@')[0],
-          photo: null,
-          status: 'pending',
-          createdAt: new Date(),
-        });
+  uid: user.uid,
+  email: user.email,
+  name: user.email.split('@')[0],
+  photo: null,
+  createdAt: new Date(),
+  access: {
+    mainApp: 'pending',
+    chatApp: 'pending',
+    musicApp: 'pending',
+  },
+});
         console.log('User doc written successfully');
       }
     } else {
@@ -43,7 +47,11 @@ export default function LoginScreen() {
           email: user.email,
           name: user.email.split('@')[0],
           photo: null,
-          status: 'pending',
+          access: {
+            mainApp: 'pending',
+            chatApp: 'pending',
+            musicApp: 'pending',
+          },
           createdAt: new Date(),
         });
         console.log('User doc created on signin');
